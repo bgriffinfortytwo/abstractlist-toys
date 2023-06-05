@@ -6,126 +6,168 @@
 
 
 typedef struct ReadLines {
-  const char *name;   // Name of this series
-  Tcl_Obj *lines;     // Read lines
-  Tcl_WideInt length; // list length
-  Tcl_Channel chan;   // Open file channel
+    Tcl_Obj *lines;   // Read lines
+    Tcl_Size length;  // list length
+    Tcl_Channel chan; // Open file channel
 } ReadLines;
 
 
 int
-my_ReadLinesObjIndex(Tcl_Interp *interp, Tcl_Obj *readlinesObj, Tcl_WideInt index, Tcl_Obj **lineObjPtr)
+my_ReadLinesObjIndex(
+    Tcl_Interp *interp,
+    Tcl_Obj *readlinesObj,
+    Tcl_Size index,
+    Tcl_Obj **lineObjPtr)
 {
-  ReadLines *readlinesRepPtr = (ReadLines*)Tcl_AbstractListGetConcreteRep(readlinesObj);
-  Tcl_Obj *lineObj;
-  int status;
+    ReadLines *readlinesRepPtr = (ReadLines*)readlinesObj->internalRep.twoPtrValue.ptr1;
+    Tcl_Obj *lineObj;
+    int status;
 
-  if (index < 0) {
-    return TCL_ERROR;
-  }
-
-  while (readlinesRepPtr->chan != NULL && index >= readlinesRepPtr->length) {
-    int slen;
-    lineObj = Tcl_NewObj();
-    slen = Tcl_GetsObj(readlinesRepPtr->chan, lineObj);
-    if (slen >= 0) {
-      if (Tcl_ListObjAppendElement(interp, readlinesRepPtr->lines, lineObj) != TCL_OK) {
-        return TCL_ERROR;
-      }
-      readlinesRepPtr->length++;
-    } else {
-      // EOF?
-      Tcl_Close(NULL, readlinesRepPtr->chan);
-      readlinesRepPtr->chan = NULL;
-      break;
+    if (index < 0) {
+	return TCL_ERROR;
     }
-  }
 
-  status = Tcl_ListObjIndex(interp, readlinesRepPtr->lines, index, lineObjPtr);
+    while (readlinesRepPtr->chan != NULL && index >= readlinesRepPtr->length) {
+	int slen;
+	lineObj = Tcl_NewObj();
+	slen = Tcl_GetsObj(readlinesRepPtr->chan, lineObj);
+	if (slen >= 0) {
+	    if (Tcl_ListObjAppendElement(interp, readlinesRepPtr->lines, lineObj)
+		!= TCL_OK) {
+		return TCL_ERROR;
+	    }
+	    readlinesRepPtr->length++;
+	} else {
+	    // EOF?
+	    Tcl_Close(NULL, readlinesRepPtr->chan);
+	    readlinesRepPtr->chan = NULL;
+	    if (index > readlinesRepPtr->length) {
+		index = readlinesRepPtr->length-1;
+	    }
+	    Tcl_IncrRefCount(readlinesRepPtr->lines);
+	    break;
+	}
+    }
 
-  return status;
+    status = Tcl_ListObjIndex(interp, readlinesRepPtr->lines, index, lineObjPtr);
+
+    return status;
 }
 
-Tcl_WideInt
-my_ReadLinesObjLength(Tcl_Obj *readLinesObjPtr)
+Tcl_Size
+my_ReadLinesObjLength(Tcl_Obj *readLinesObj)
 {
-  ReadLines *readLinesRepPtr = (ReadLines *)Tcl_AbstractListGetConcreteRep(readLinesObjPtr);
-  return readLinesRepPtr->length;
+    ReadLines *readLinesRepPtr =
+	(ReadLines*)readLinesObj->internalRep.twoPtrValue.ptr1;
+    return readLinesRepPtr->length;
 }
 
 static void
-DupReadLinesRep(Tcl_Obj *srcPtr, Tcl_Obj *copyPtr)
+UpdateStringRep(Tcl_Obj *objPtr)
 {
-  ReadLines *srcReadLines = (ReadLines*)Tcl_AbstractListGetConcreteRep(srcPtr);
-  ReadLines *copyReadLines = (ReadLines*)Tcl_Alloc(sizeof(ReadLines));
-  /* TODO: This is not right! */
-  memcpy(copyReadLines, srcReadLines, sizeof(ReadLines));
-  Tcl_AbstractListSetConcreteRep(copyPtr,copyReadLines);
-
-  return;
+    ReadLines *readlinesRepPtr = (ReadLines*)objPtr->internalRep.twoPtrValue.ptr1;
+    Tcl_Size strlen;
+    const char *str = Tcl_GetStringFromObj(readlinesRepPtr->lines, &strlen);
+    Tcl_InitStringRep(objPtr, str, strlen);
+    Tcl_InvalidateStringRep(readlinesRepPtr->lines); /* don't need 2 copies */
 }
 
-Tcl_Obj *myNewReadLinesObj(Tcl_WideInt start, Tcl_WideInt length);
+Tcl_Obj *myNewReadLinesObj(Tcl_Size start, Tcl_WideInt length);
 static void freeRep(Tcl_Obj* alObj);
+static void DupReadLinesRep(Tcl_Obj *srcObj, Tcl_Obj *copyObj);
 
-static Tcl_AbstractListType readLinesType = {
-	TCL_ABSTRACTLIST_VERSION_1,
-	"readlines",
-	NULL,
-	DupReadLinesRep,
+static Tcl_ObjType readLinesType = {
+    "readlines",
+    freeRep,
+    DupReadLinesRep,
+    UpdateStringRep, /* use default update string */
+    NULL,
+    TCL_OBJTYPE_V2(
 	my_ReadLinesObjLength,
 	my_ReadLinesObjIndex,
-	NULL/*ObjRange*/,
-	NULL/*ObjReverse*/,
-        NULL/*my_ReadLinesGetElements*/,
-        freeRep,
-	NULL /* use default update string */
+	NULL, /* ObjRange */
+	NULL, /* ObjReverse */
+        NULL, /* my_ReadLinesGetElements */
+	NULL, /* setElements */
+	NULL, /* replace */
+	NULL) /* getDoubleProc */
 };
+
+static void
+DupReadLinesRep(Tcl_Obj *srcObj, Tcl_Obj *copyObj)
+{
+    ReadLines *srcReadLines = (ReadLines*)srcObj->internalRep.twoPtrValue.ptr1;
+    ReadLines *copyReadLines = (ReadLines*)Tcl_Alloc(sizeof(ReadLines));
+    copyObj->internalRep.twoPtrValue.ptr1 = copyReadLines;
+    /* TODO: This is not right! */
+    memcpy(copyReadLines, srcReadLines, sizeof(ReadLines));
+    Tcl_IncrRefCount(copyReadLines->lines);
+    copyObj->typePtr = &readLinesType;
+    return;
+}
 
 Tcl_Obj *
 my_NewReadLinesObj(Tcl_Interp *interp, int objc, Tcl_Obj * const objv[])
 {
-  Tcl_WideInt length;
-  ReadLines *readLinesRepPtr;
-  static const char *readLinesName = "readlines";
-  size_t repSize;
-  Tcl_Obj *readLinesPtr, *filenameObj;
-  Tcl_Channel chan;
-  char *filename;
+    Tcl_Size length = 0;
+    ReadLines *readLinesRepPtr;
+    Tcl_Size repSize;
+    Tcl_Obj *readLinesObj, *filenameObj;
+    Tcl_Channel chan;
+    char *filename;
 
-  filenameObj = objv[0];
-  Tcl_IncrRefCount(filenameObj);
+    filenameObj = objv[0];
+    Tcl_IncrRefCount(filenameObj);
 
-  filename = Tcl_GetStringFromObj(filenameObj, NULL);
+    filename = Tcl_GetStringFromObj(filenameObj, NULL);
 
-  chan = Tcl_OpenFileChannel(interp, filename, "r", 0644);
+    chan = Tcl_OpenFileChannel(interp, filename, "r", 0644);
 
-  if (chan) {
-      repSize = sizeof(ReadLines);
-      readLinesPtr = Tcl_AbstractListObjNew(interp, &readLinesType);
-      readLinesRepPtr = (ReadLines*)Tcl_Alloc(repSize);
-      readLinesRepPtr->name = readLinesName;
-      readLinesRepPtr->length = 0;
-      readLinesRepPtr->lines = Tcl_NewObj();
-      readLinesRepPtr->chan = chan;
-      Tcl_AbstractListSetConcreteRep(readLinesPtr, readLinesRepPtr);
+    if (chan) {
+	repSize = sizeof(ReadLines);
+	readLinesObj = Tcl_NewObj();
+	readLinesObj->typePtr = &readLinesType;
+	readLinesRepPtr = (ReadLines*)Tcl_Alloc(repSize);
+	readLinesRepPtr->length = 0;
+	readLinesRepPtr->lines = Tcl_NewObj();
+	readLinesRepPtr->chan = chan;
+	readLinesObj->internalRep.twoPtrValue.ptr1 = readLinesRepPtr;
+    } else {
+	return NULL;
+    }
 
-      if (length > 0) {
-	  Tcl_InvalidateStringRep(readLinesPtr);
-      } else {
-	  Tcl_InitStringRep(readLinesPtr, NULL, 0);
-      }
-  } else {
-      readLinesPtr = NULL;
-  }
+    // Read in the file
+    while (!Tcl_Eof(chan)) {
+	Tcl_Obj *lineObj;
+	int status = my_ReadLinesObjIndex(interp, readLinesObj, length, &lineObj);
+	if (status == TCL_OK) {
+	    length++;
+	} else {
+	    break;
+	}
+    }
+    if (readLinesRepPtr->chan) {
+	if (Tcl_Close(interp, readLinesRepPtr->chan) != TCL_OK) {
+	    return NULL;
+	}
+    }
+    if (length > 0) {
+	Tcl_InvalidateStringRep(readLinesObj);
+    } else {
+	Tcl_InitStringRep(readLinesObj, NULL, 0);
+    }
 
-  Tcl_DecrRefCount(filenameObj);
+    Tcl_DecrRefCount(filenameObj);
 
-  return readLinesPtr;
+    return readLinesObj;
 }
 
-static int lReadLinesObjCmd(void *clientData, Tcl_Interp *interp, int objc, Tcl_Obj * const objv[]) {
-
+static int lReadLinesObjCmd(
+    void *clientData,
+    Tcl_Interp *interp,
+    int objc,
+    Tcl_Obj * const objv[])
+{
   Tcl_Obj *readLinesObj;
 
   if (objc != 2) {
@@ -137,7 +179,7 @@ static int lReadLinesObjCmd(void *clientData, Tcl_Interp *interp, int objc, Tcl_
 
   if (readLinesObj) {
     // Read first line
-    Tcl_Obj *lastLine;
+//    Tcl_Obj *lastLine;
 
     // stat file to get size
     // allocate memory
@@ -145,7 +187,7 @@ static int lReadLinesObjCmd(void *clientData, Tcl_Interp *interp, int objc, Tcl_
     // scan for \n using const char *Tcl_UtfFindFirst(src, ch); const char *src, int ch (unicode character)
     // build int[] list of offsets to the start of each line.
 
-    if (my_ReadLinesObjIndex(interp, readLinesObj, INT_MAX, &lastLine) == TCL_OK) {
+    if (1 /*my_ReadLinesObjIndex(interp, readLinesObj, INT_MAX, &lastLine) == TCL_OK*/) {
 	Tcl_SetObjResult(interp, readLinesObj);
 	return TCL_OK;
     } else {
@@ -165,11 +207,17 @@ int Readlines_Init(Tcl_Interp *interp) {
 }
 
 static void
-freeRep(Tcl_Obj* alObj)
+freeRep(Tcl_Obj* rlObj)
 {
-    void *alRepPtr = Tcl_AbstractListGetConcreteRep(alObj);
-    Tcl_Free((char*)alRepPtr);
-    Tcl_AbstractListSetConcreteRep(alObj, NULL);
+    ReadLines *rlRepPtr = (ReadLines*)rlObj->internalRep.twoPtrValue.ptr1;
+    if (rlRepPtr->chan) {
+	Tcl_Close(NULL, rlRepPtr->chan);
+	rlRepPtr->chan = NULL;
+    }
+    /* Free the lines here */
+    Tcl_DecrRefCount(rlRepPtr->lines);
+    Tcl_Free((char*)rlRepPtr);
+    rlObj->internalRep.twoPtrValue.ptr1 = NULL;
 }
 
 /* readlines.so makefile:
