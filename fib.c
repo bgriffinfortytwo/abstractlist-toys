@@ -15,8 +15,8 @@ static Tcl_Obj *newFibSeriesObj(Tcl_WideInt start, Tcl_WideInt length);
 
 static Tcl_WideInt
 fib(Tcl_WideInt n) {
-  static double phi = (1 + sqrt(5)) / 2;
-  return round(pow(phi, n) / sqrt(5));
+  double phi = (1 + sqrt(5.0)) / 2.0;
+  return round(pow(phi, n) / sqrt(5.0));
 }
 
 static Tcl_Obj *Tcl_NewFibSeriesObj(int objc, Tcl_Obj *const objv[]);

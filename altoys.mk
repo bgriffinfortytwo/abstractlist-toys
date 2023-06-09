@@ -37,5 +37,8 @@ readlines.so: readlines.c $(TCL_STUB_LIB_PATH)
 lstring.so: lstring.c $(TCL_STUBLIB)
 	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
 
+lgen.so: lgen.c $(TCL_STUBLIB)
+	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
+
 test: all all.tcl
 	$(TCLSH) all.tcl
