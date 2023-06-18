@@ -127,8 +127,7 @@ static Tcl_ObjType polyType = {
 	NULL, /* reverse */
 	NULL, /* get elements */
         NULL, /* set element */
-        NULL, /* replace */
-        NULL  /* get double */)
+        NULL) /* replace */
 };
 
 static void

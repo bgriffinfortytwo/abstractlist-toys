@@ -57,8 +57,7 @@ static Tcl_ObjType lstringType = {
 	my_LStringObjReverse,
         NULL, /*my_LStringGetElements*/
 	my_LStringObjSetElem,
-	my_LStringReplace,
-	NULL)
+	my_LStringReplace)
 };
 
 

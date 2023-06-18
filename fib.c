@@ -163,8 +163,7 @@ static Tcl_ObjType fibType = {
 	NULL, /*FibonocciObjReverse*/
         NULL, /*FibonocciGetElements*/
 	NULL, /* SetElem */
-	NULL, /* Replace */
-	NULL)
+	NULL) /* Replace */
 };
 
 static Tcl_Obj *

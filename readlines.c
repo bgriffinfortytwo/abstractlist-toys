@@ -89,8 +89,7 @@ static Tcl_ObjType readLinesType = {
 	NULL, /* ObjReverse */
         NULL, /* my_ReadLinesGetElements */
 	NULL, /* setElements */
-	NULL, /* replace */
-	NULL) /* getDoubleProc */
+	NULL) /* replace */
 };
 
 static void
@@ -137,7 +136,7 @@ my_NewReadLinesObj(Tcl_Interp *interp, int objc, Tcl_Obj * const objv[])
     }
 
     // Read in the file
-    while (!Tcl_Eof(chan)) {
+    while (readLinesRepPtr->chan && !Tcl_Eof(readLinesRepPtr->chan)) {
 	Tcl_Obj *lineObj;
 	int status = my_ReadLinesObjIndex(interp, readLinesObj, length, &lineObj);
 	if (status == TCL_OK) {
