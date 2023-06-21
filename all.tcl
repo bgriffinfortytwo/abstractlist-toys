@@ -1,11 +1,12 @@
 
-set fl [glob *.tcl]
+# memory validate on
 
-set fl [lsearch -all -inline -not -regexp $fl (pkgIndex.tcl|all.tcl)]
-
+set fl {lgen.tcl fib.tcl poly.tcl readlines.tcl lstring.tcl}
 puts fl=$fl
-foreach f $fl {
-    puts ====-$f-====
-    source $f
-    puts ====-done-====
-}
+set script [lmap f $fl { format "puts #\\ ====-%s-====\nsource %s\nputs #\\ ====-done-====\n" $f $f }]
+set x [join $script {}]
+puts "# Evaluate:\n$x"
+
+eval $x
+
+puts "So Long!"

@@ -15,15 +15,15 @@ INCLUDES = $(TCL_INCLUDE_SPEC)
 CFLAGS = -pipe -g -DNDEBUG -Wall -fPIC $(INCLUDES) $(DEFS)
 LIBS = $(TCL_STUB_LIB_SPEC)
 
-TARGETS = fib.so poly.so readlines.so lstring.so
+TARGETS = fib.so poly.so readlines.so lstring.so lgen.so
 
 .so:.c
 	gcc -g -fPIC $(CFLAGS) $< -o $@ -m64  --shared $(TCL_STUB_LIB_PATH)
 
 all: $(TARGETS)
 
-clean: $(TARGETS)
-	rm -f $^
+clean:
+	rm -f $(TARGETS)
 
 fib.so: fib.c $(TCL_STUB_LIB_PATH)
 	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
@@ -40,5 +40,6 @@ lstring.so: lstring.c $(TCL_STUBLIB)
 lgen.so: lgen.c $(TCL_STUBLIB)
 	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
 
-test: all all.tcl
+
+test: all all.tcl $(TARGETS)
 	$(TCLSH) all.tcl

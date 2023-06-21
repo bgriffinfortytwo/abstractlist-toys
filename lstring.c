@@ -154,7 +154,8 @@ DupLStringRep(Tcl_Obj *srcPtr, Tcl_Obj *copyPtr)
 
   memcpy(copyLString, srcLString, sizeof(LString));
   copyLString->string = (char*)Tcl_Alloc(srcLString->allocated);
-  strcpy(copyLString->string, srcLString->string);
+  strncpy(copyLString->string, srcLString->string,srcLString->strlen);
+  copyLString->string[srcLString->strlen] = '\0';
   copyPtr->internalRep.twoPtrValue.ptr1 = copyLString;
   copyPtr->typePtr = &lstringType;
 
@@ -180,6 +181,8 @@ SetLStringFromAny(Tcl_Interp *interp, Tcl_Obj *objPtr)
     lstringRepPtr->allocated = lstringRepPtr->strlen + 1;
     lstringRepPtr->string = (char*)Tcl_Alloc(lstringRepPtr->allocated);
     strncpy(lstringRepPtr->string, string, lstringRepPtr->strlen);
+    lstringRepPtr->string[lstringRepPtr->strlen] = '\0';
+
     objPtr->internalRep.twoPtrValue.ptr1 = lstringRepPtr;
     objPtr->typePtr = &lstringType;
     if (lstringRepPtr->strlen > 0) {
@@ -468,6 +471,7 @@ myNewLStringObj(
     lstringRepPtr->allocated = lstringRepPtr->strlen + 1;
     lstringRepPtr->string = (char*)Tcl_Alloc(lstringRepPtr->allocated);
     strncpy(lstringRepPtr->string, string, length);
+    lstringRepPtr->string[lstringRepPtr->strlen] = '\0';
     lstringPtr->internalRep.twoPtrValue.ptr1 = lstringRepPtr;
     if (lstringRepPtr->strlen > 0) {
 	Tcl_InvalidateStringRep(lstringPtr);
