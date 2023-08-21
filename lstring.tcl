@@ -72,7 +72,9 @@ puts s-isa:[value-isa s list]
 puts "\n# lreverse is supported by lstring"
 set fr [lstring $str]
 puts fr-isa:[value-isa fr]
-puts reverse:[lreverse $fr]
+set rfr [lreverse $fr]
+puts rfr-isa:[value-isa rfr]
+puts reverse:$rfr
 puts fr-isa:[value-isa fr]
 
 puts "\n# lsearch no-shimmer (Parse out the words from the list of characters.)"
@@ -100,7 +102,8 @@ set m [lreplace $l 19 22 F a i l]
 puts after-l:[value-isa l lstring]
 puts after-m:[value-isa m lstring]
 
-puts l=[expr {[join $l {}] eq $str2}]
+puts l\ [expr {([join $l {}] eq $str2) ? "is good" : "is incorrect"}]
+puts m\ [expr {([join $m {}] eq [join $expres {}]) ? "is good" : "is incorrect"}]
 if {$expres ne $m} {
     puts "lreplace error: expecting $expres\ngot $m"
 }
@@ -157,7 +160,7 @@ proc test3 {l dotxl} {
     puts len=[llength $l]
     puts "lset l $x+1 \\n"
     lset l $x+1 \n
-    puts l=$l
+    puts l=[join $l {}]
     puts after3-2:[value-isa l]
     return
 }
@@ -199,10 +202,12 @@ proc test5 {} {
 test2  [lstring $str2]
 test2r [lstring $str2]
 test3  [lstring $str2] [lsearch -all [lstring $str2] "."]
-puts done!
+#puts done!
 #exit
 test4  [lstring $str2]
-test5
+if {[catch {test5} rv]} {
+    puts "\ntest5 expected error: $rv"
+}
 
 puts "# Test join:"
 puts joined-l:[join $l {}]

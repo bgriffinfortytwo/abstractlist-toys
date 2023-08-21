@@ -89,7 +89,8 @@ static Tcl_ObjType readLinesType = {
 	NULL, /* ObjReverse */
         NULL, /* my_ReadLinesGetElements */
 	NULL, /* setElements */
-	NULL) /* replace */
+	NULL, /* replace */
+        NULL) /* in operation */
 };
 
 static void

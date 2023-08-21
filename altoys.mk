@@ -17,16 +17,18 @@ LIBS = $(TCL_STUB_LIB_SPEC)
 
 TARGETS = fib.so poly.so readlines.so lstring.so lgen.so
 
-.so:.c
-	gcc -g -fPIC $(CFLAGS) $< -o $@ -m64  --shared $(TCL_STUB_LIB_PATH)
+#.so:.c
+#	gcc -g -fPIC $(CFLAGS) $< -o $@ -m64  --shared $(TCL_STUB_LIB_PATH)
 
 all: $(TARGETS)
 
 clean:
 	rm -f $(TARGETS)
 
+fib: fib.so
+
 fib.so: fib.c $(TCL_STUB_LIB_PATH)
-	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
+	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared 
 
 poly.so: poly.c $(TCL_STUB_LIB_PATH)
 	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared

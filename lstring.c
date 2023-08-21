@@ -57,7 +57,8 @@ static Tcl_ObjType lstringType = {
 	my_LStringObjReverse,
         NULL, /*my_LStringGetElements*/
 	my_LStringObjSetElem,
-	my_LStringReplace)
+	my_LStringReplace,
+        NULL) /* in operation */
 };
 
 
@@ -202,7 +203,25 @@ static void
 UpdateStringRep(Tcl_Obj *objPtr)
 {
     LString *lstringRepPtr = (LString*)objPtr->internalRep.twoPtrValue.ptr1;
-    Tcl_InitStringRep(objPtr, lstringRepPtr->string, lstringRepPtr->strlen);
+    Tcl_Size slen = lstringRepPtr->strlen * 2;
+    char *rp;
+    char *sp = lstringRepPtr->string;
+    while (*sp) {
+	if (Tcl_UniCharIsSpace((int)*sp++)) {
+	    slen += 2; // account for needed braces
+	}
+    }
+    sp = lstringRepPtr->string;
+    rp = Tcl_InitStringRep(objPtr, NULL, slen);
+    while (*sp) {
+	if (Tcl_UniCharIsSpace((int)*sp)) {
+	    *rp++ = '{'; *rp++ = *sp++; *rp++ = '}';
+	} else {
+	    *rp++ = *sp++;
+	}
+	*rp++ = ' ';
+    }
+    *(rp-1) = '\0';
 }
 
 
@@ -264,8 +283,17 @@ my_LStringObjSetElem(
 	lstringRepPtr->string = (char*)Tcl_Realloc(lstringRepPtr->string, lstringRepPtr->strlen+1);
     }
 
-    newvalue = Tcl_GetString(valueObj);
-    lstringRepPtr->string[index] = newvalue[0];
+    if (valueObj) {
+	newvalue = Tcl_GetString(valueObj);
+	lstringRepPtr->string[index] = newvalue[0];
+    } else {
+	/* Delete at the end, (i.e. pop) */
+	lstringRepPtr->string[index] = '\0';
+	lstringRepPtr->strlen--;
+    }
+
+    /* assure string is nul terminated */
+    lstringRepPtr->string[lstringRepPtr->strlen] = '\0';
 
     Tcl_InvalidateStringRep(returnObj);
 
@@ -311,6 +339,7 @@ my_LStringObjReverse(Tcl_Interp *interp, Tcl_Obj *srcObj, Tcl_Obj **newObjPtr)
     }
     revObj->internalRep.twoPtrValue.ptr1 = revRep;
     revObj->typePtr = &lstringType;
+    Tcl_InvalidateStringRep(revObj);
     *newObjPtr = revObj;
     return TCL_OK;
 }
@@ -399,13 +428,13 @@ my_LStringReplace(
 	newStr[x] = oldStr[kx];
     }
     // Insert new elements into new string
-    for(x=first, ix=0; ix<numToInsert; x++, ix++) {
+    for(x=first, ix=0; ix<numToInsert; x++, ix++, kx++) {
 	char const *svalue = Tcl_GetString(insertObjs[ix]);
 	newStr[x] = svalue[0];
     }
     // Move remaining elements
-    if ((first+numToDelete) < newLen) {
-	for(/*x,*/ kx=first+numToDelete; (kx <lstringRep->strlen && x<newLen); x++, kx++) {
+    if ((first+(numToInsert-numToDelete)) < newLen) {
+	for(/*x,*/ kx += (numToDelete-numToInsert); (kx <lstringRep->strlen && x<newLen); x++, kx++) {
 	    newStr[x] = oldStr[kx];
 	}
     }

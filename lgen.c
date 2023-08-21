@@ -163,7 +163,8 @@ static Tcl_ObjType lgenType = {
 	NULL, /* reverse */
 	NULL, /* get elements */
         NULL, /* set element */
-        NULL) /* replace */
+        NULL, /* replace */
+        NULL) /* in operation */
 };
 
 /*
