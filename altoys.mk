@@ -42,6 +42,9 @@ lstring.so: lstring.c $(TCL_STUBLIB)
 lgen.so: lgen.c $(TCL_STUBLIB)
 	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
 
+lweave.so: lweave.c $(TCL_STUBLIB)
+	gcc -g $(CFLAGS) $< -o $@ -m64 $(LIBS) --shared
+
 
 test: all all.tcl $(TARGETS)
 	$(TCLSH) all.tcl
