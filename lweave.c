@@ -22,10 +22,22 @@ static int my_LWeaveObjIndex(Tcl_Interp *interp,
 			      Tcl_Obj *lweaveObj,
 			      Tcl_Size index,
 			      Tcl_Obj **charObjPtr);
-
 #if 0 // Not Implemented
+static int my_LWeaveObjRange(
+    Tcl_Interp *interp,  /* For error reporting */
+    Tcl_Obj *fibObj,     /* List object to take a range from. */
+    Tcl_Size fromIdx,    /* Index of first element to include. */
+    Tcl_Size toIdx,      /* Index of last element to include. */
+    Tcl_Obj **newObjPtr); /* return value */
+#endif // Not Implemented
+static int my_LWeaveInOperator(Tcl_Interp *interp, Tcl_Obj *valueObj,
+                               Tcl_Obj *listObj, int *boolResult);
+
+
 static int my_LWeaveObjReverse(Tcl_Interp *interp, Tcl_Obj *srcObj,
 				Tcl_Obj **newObjPtr);
+
+#if 0 // Not Implemented
 static int my_LWeaveReplace(Tcl_Interp *interp,
 		      Tcl_Obj *listObj,
 		      Tcl_Size first,
@@ -45,6 +57,7 @@ typedef struct LWeave {
 			 // (actual length may vary; this is the max.)
     Tcl_Size llen;       // Total list length
     Tcl_Size allocated;  // num bytes allocated to lists.
+    int reversed;        // Reverse indexing
 } LWeave;
 
 /*
@@ -59,12 +72,12 @@ static Tcl_ObjType lweaveType = {
     TCL_OBJTYPE_V2(
 	my_LWeaveObjLength,
 	my_LWeaveObjIndex,
-	NULL, /*ObjRange*/
-	NULL, /*my_LWeaveObjReverse*/
+	NULL, /*my_LWeaveObjRange*/
+	my_LWeaveObjReverse,
 	NULL, /*my_LWeaveGetElements*/
 	my_LWeaveObjSetElem,
 	NULL, /*my_LWeaveReplace,*/
-	NULL) /* in operation */
+	my_LWeaveInOperator) /* in operation */
 };
 
 
@@ -96,6 +109,10 @@ my_LWeaveObjIndex(
 {
   LWeave *lweaveRepPtr = (LWeave*)lweaveObj->internalRep.twoPtrValue.ptr1;
 
+  if (lweaveRepPtr->reversed) {
+      index = lweaveRepPtr->llen - index - 1;
+  }
+
   if (0 <= index && index < lweaveRepPtr->llen) {
     Tcl_Size listi = index % lweaveRepPtr->nlists;
     Tcl_Size elemi = index / lweaveRepPtr->nlists;
@@ -103,7 +120,12 @@ my_LWeaveObjIndex(
     Tcl_Size ribbonLen;
     Tcl_ListObjLength(interp, ribbon, &ribbonLen);
     if (elemi < ribbonLen) {
-      return Tcl_ListObjIndex(interp, ribbon, elemi, objPtr);
+	int status = Tcl_ListObjIndex(interp, ribbon, elemi, objPtr);
+	if (status != TCL_OK) {
+	    printf("%s\n", Tcl_GetStringResult(interp));
+	    return status;
+	}
+	return TCL_OK;
     }
   }
 
@@ -166,6 +188,7 @@ DupLWeaveRep(Tcl_Obj *srcPtr, Tcl_Obj *copyPtr)
     copyLWeave->lists[i] = srcLWeave->lists[i];
     Tcl_IncrRefCount(copyLWeave->lists[i]);
   }
+  copyPtr->internalRep.twoPtrValue.ptr1 = copyLWeave;
   copyPtr->typePtr = &lweaveType;
   return;
 }
@@ -332,33 +355,24 @@ my_LWeaveObjSetElem(
  *
  *----------------------------------------------------------------------
  */
-#if 0 // Not supported
+
 static int
-my_LWeaveObjReverse(Tcl_Interp *interp, Tcl_Obj *srcObj, Tcl_Obj **newObjPtr)
+my_LWeaveObjReverse(
+    Tcl_Interp *interp,
+    Tcl_Obj *lweaveObj,
+    Tcl_Obj **newObjPtr)
 {
-    Tcl_Obj *revObj = Tcl_NewObj();
-    LWeave *srcRep = (LWeave*)srcObj->internalRep.twoPtrValue.ptr1;
-    LWeave *revRep = (LWeave*)Tcl_Alloc(sizeof(LWeave));
-    Tcl_Size len;
-    char *srcp, *dstp, *endp;
-    len = srcRep->strlen;
-    revRep->strlen = len;
-    revRep->allocated = len+1;
-    revRep->string = (char*)Tcl_Alloc(revRep->allocated);
-    srcp = srcRep->string;
-    endp = &srcRep->string[len];
-    dstp = &revRep->string[len];
-    *dstp-- = 0;
-    while (srcp < endp) {
-	*dstp-- = *srcp++;
-    }
-    revObj->internalRep.twoPtrValue.ptr1 = revRep;
-    revObj->typePtr = &lweaveType;
+    Tcl_Obj *revObj = Tcl_DuplicateObj(lweaveObj);
+    LWeave *revRepPtr = (LWeave*)revObj->internalRep.twoPtrValue.ptr1;
+
     Tcl_InvalidateStringRep(revObj);
+
+    revRepPtr->reversed = ! revRepPtr->reversed;
+
     *newObjPtr = revObj;
     return TCL_OK;
 }
-#endif // Not supported
+
 
 /*
  *----------------------------------------------------------------------
@@ -471,7 +485,57 @@ my_LWeaveReplace(
 
     return TCL_OK;
 }
+
+/*
+ * Range operation
+ */
+
+static int my_LWeaveObjRange(
+    Tcl_Interp *interp,  /* For error reporting */
+    Tcl_Obj *listObj,     /* List object to take a range from. */
+    Tcl_Obj **newObjPtr) /* return value */
+{
+    LWeave *lweaveRep = (LWeave*)listObj->internalRep.twoPtrValue.ptr1;
+
+}
 #endif
+
+static int my_LWeaveInOperator(
+    Tcl_Interp *interp,
+    Tcl_Obj *valueObj,
+    Tcl_Obj *listObj,
+    int *boolResult
+    )
+{
+    LWeave *lweaveRep = (LWeave*)listObj->internalRep.twoPtrValue.ptr1;
+    Tcl_Size i, elemi, listLen, valueLen, elemLen;
+    Tcl_Obj *listPtr, *elemPtr;
+    const char *value = Tcl_GetStringFromObj(valueObj, &valueLen);
+
+    for (i=0; i<lweaveRep->nlists; i++) {
+        listPtr = lweaveRep->lists[i];
+        Tcl_ListObjLength(interp, listPtr, &listLen);
+        for (elemi=0; elemi < listLen; elemi++) {
+            Tcl_ListObjIndex(interp, listPtr, elemi, &elemPtr);
+            const char *str = Tcl_GetStringFromObj(elemPtr, &elemLen);
+            if (valueLen == elemLen &&
+                strncmp(value, str, elemLen) == 0) {
+                if (boolResult) {
+                    *boolResult = 1;
+                }
+                Tcl_BounceRefCount(elemPtr);
+                return TCL_OK;
+            }
+            Tcl_BounceRefCount(elemPtr);
+        }
+    }
+    Tcl_BounceRefCount(elemPtr);
+    if (boolResult) {
+        *boolResult = 0;
+    }
+    return TCL_OK;
+}
+
 
 /*
  *----------------------------------------------------------------------
@@ -515,6 +579,7 @@ myNewLWeaveObj(
     lweaveRepPtr->allocated = (sizeof(Tcl_Obj*) * lweaveRepPtr->nlists);
     lweaveRepPtr->lists = (Tcl_Obj**)Tcl_Alloc(lweaveRepPtr->allocated);
     lweaveRepPtr->nominalLen = 0;
+    lweaveRepPtr->reversed = 0;
     for (Tcl_Size i=0; i<objc; i++) {
         lweaveRepPtr->lists[i] = objv[i];
         Tcl_IncrRefCount(lweaveRepPtr->lists[i]);

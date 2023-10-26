@@ -1,5 +1,5 @@
-
-load ./lweave.so
+lappend auto_path [pwd]
+package require lweave
 
 proc Task {} {
     set n 100000
@@ -10,6 +10,8 @@ proc Task {} {
     puts timeL1->$timeL1
     set timeL2 [time {set L2 [Get_List2 $n ]}]
     puts timeL2->$timeL2
+    set timeL3 [time {set L3 [Get_List3 $n ]}]
+    puts timeL2->$timeL3
 
     set time8 [time {set Z8 [ZIP_Main8 $L1 $L2]} $t]
     puts time8->$time8
@@ -36,6 +38,9 @@ proc Task {} {
     puts Z0-check->[time {ZipCheck $L1 $L2 $Z0}]
     puts Z8-check->[time {ZipCheck $L1 $L2 $Z8}]
     puts [time {dict keys $Z0}]
+
+    set time9 [time {set z9 [ZIP_Main8 $L1 $L3]}]
+    puts time9->$time9
 }
 
 proc ZipCheck {0 1 zip} {
@@ -183,6 +188,24 @@ proc Get_List1 {n} {
 proc Get_List2 {n} {
     return [lrepeat $n {A B C d e F} ]
 }
+
+proc Get_List3 {n} {
+    return [lrepeat $n [Get_List1 4]]
+}
+
+proc reverse_test {} {
+    set x [lweave {a b c} {1 2 3}]
+    puts x=$x
+    set y [lreverse $x]
+    puts y=$y
+    puts $x\ ->\ \ $y
+
+    puts "index 1 -> [lindex $x 1]"
+    puts "rev-index 1 -> [lindex $y 1]"
+}
+
+puts Reverse\ Test
+reverse_test
 
 puts Start\ Task
 Task
